@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# glm-search — Search the web via Zhipu GLM Web Search MCP
+# Usage: glm-search <query> [count] [recency] [content_size]
+#   query       – search text (required)
+#   count       – number of results, 1-50 (default: 10)
+#   recency     – noLimit | oneYear | oneMonth | oneWeek | oneDay (default: noLimit)
+#   content_size – medium | high (default: medium)
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SKILL_DIR="$(dirname "$SCRIPT_DIR")"
+
+# Config paths (relative to home, no hardcoding)
+MCP_CONFIG="${HOME}/.openclaw/config/mcporter/mcporter.json"
+
+if [ ! -f "$MCP_CONFIG" ]; then
+  echo "Error: mcporter config not found at $MCP_CONFIG" >&2
+  echo "Run the setup script first: bash ${SKILL_DIR}/scripts/setup.sh" >&2
+  exit 1
+fi
+
+if [ $# -lt 1 ]; then
+  echo "Usage: glm-search <query> [count] [recency] [content_size]" >&2
+  echo "  query        – search text" >&2
+  echo "  count        – 1-50, default 10" >&2
+  echo "  recency      – noLimit|oneYear|oneMonth|oneWeek|oneDay" >&2
+  echo "  content_size – medium|high" >&2
+  exit 2
+fi
+
+QUERY="$1"
+COUNT="${2:-10}"
+RECENCY="${3:-noLimit}"
+CONTENT_SIZE="${4:-medium}"
+
+exec npx -y mcporter --config "$MCP_CONFIG" call glm-search.webSearchPro \
+  search_query="$QUERY" \
+  count="$COUNT" \
+  search_recency_filter="$RECENCY" \
+  content_size="$CONTENT_SIZE"
