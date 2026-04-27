@@ -1,65 +1,105 @@
-# Zhipu GLM Web Search MCP — API Reference
+# Zhipu GLM Web Search — API Reference
 
-## MCP Endpoint
+## Endpoints
+
+### REST API (cURL mode)
 
 ```
-https://open.bigmodel.cn/api/mcp-broker/proxy/web-search/mcp?Authorization=<YOUR_API_KEY>
+POST https://open.bigmodel.cn/api/paas/v4/web_search
+Authorization: Bearer <ZHIPU_API_KEY>
+Content-Type: application/json
+```
+
+### MCP Broker (mcporter mode)
+
+```
+SSE: https://open.bigmodel.cn/api/mcp-broker/proxy/web-search/mcp?Authorization=<ZHIPU_API_KEY>
 ```
 
 - **Transport**: SSE (Server-Sent Events)
-- **Auth**: API key passed as URL query parameter `Authorization=`
-- **Do NOT use**: `https://open.bigmodel.cn/api/mcp/web_search_prime/mcp` (deprecated; `tools/call` returns 401)
+- **Auth**: API key as URL query parameter `Authorization=`
+- **⚠️ Do NOT use**: `https://open.bigmodel.cn/api/mcp/web_search_prime/mcp` (deprecated; returns 401 on tools/call)
 
-## Available Tools
+## Search Engines
 
-| Tool Name         | Description                          | Engine         |
-|-------------------|--------------------------------------|----------------|
-| `webSearchPro`    | Full-featured search (recommended)   | Zhipu + multi  |
-| `webSearchSogou`  | Sogou engine                         | Sogou          |
-| `webSearchQuark`  | Quark engine                         | Quark          |
-| `webSearchStd`    | Standard search                      | Zhipu          |
+| REST API Name | MCP Tool Name | Description |
+|---------------|---------------|-------------|
+| `search_pro` | `webSearchPro` | Advanced multi-engine search (**recommended**) |
+| `search_pro_quark` | `webSearchQuark` | Quark engine, Chinese content |
+| `search_pro_sogou` | `webSearchSogou` | Sogou engine, China domestic |
+| `search_std` | `webSearchStd` | Basic standard search |
 
-### Common Parameters (all tools)
+## Parameters
 
-| Parameter                | Type   | Required | Default  | Description                                      |
-|--------------------------|--------|----------|----------|--------------------------------------------------|
-| `search_query`           | string | ✅       | —        | Search text (recommend ≤70 chars)                 |
-| `count`                  | int    | ❌       | 10       | Number of results (1-50)                          |
-| `search_recency_filter`  | string | ❌       | noLimit  | `noLimit`, `oneYear`, `oneMonth`, `oneWeek`, `oneDay` |
-| `content_size`           | string | ❌       | medium   | `medium` (400-600 chars) or `high` (up to 2500 chars) |
-| `search_domain_filter`   | string | ❌       | —        | Restrict to specific domain, e.g. `www.example.com` |
+| Parameter | REST API | MCP | Type | Default | Description |
+|-----------|----------|-----|------|---------|-------------|
+| `search_query` | ✅ | ✅ | string | — | Search text (≤70 chars recommended) |
+| `search_engine` | ✅ | — (tool name) | enum | — | Engine selection |
+| `search_intent` | ✅ | ❌ | boolean | false | Enable intent recognition |
+| `count` | ✅ | ✅ | integer | 10 | Results 1-50 |
+| `search_recency_filter` | ✅ | ✅ | enum | noLimit | Time range filter |
+| `content_size` | ✅ | ✅ | enum | medium | Summary detail level |
+| `search_domain_filter` | ✅ | ✅ | string | — | Domain whitelist |
 
-### Response Format
+### Time Range Values
 
-```json
-[
-  {
-    "refer": "ref_1",
-    "title": "Page Title",
-    "link": "https://example.com/page",
-    "media": "Source Name",
-    "content": "Page summary/abstract...",
-    "icon": "https://sfile.chatglm.cn/searchImage/...",
-    "publish_date": "2026-04-27"
-  }
-]
+`noLimit` · `oneYear` · `oneMonth` · `oneWeek` · `oneDay`
+
+### Content Size Values
+
+- `medium` — 400-600 character summaries
+- `high` — up to 2500 character summaries (higher cost)
+
+## cURL Examples
+
+### Basic
+
+```bash
+curl -s POST https://open.bigmodel.cn/api/paas/v4/web_search \
+  -H "Authorization: Bearer $ZHIPU_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"search_query":"AI news","search_engine":"search_pro","count":10}'
 ```
 
-## Prerequisites
+### With All Options
 
-- Zhipu API key from <https://open.bigmodel.cn>
-- `mcporter` CLI: `npm i -g mcporter`
-- Network access to `open.bigmodel.cn`
+```bash
+curl -s POST https://open.bigmodel.cn/api/paas/v4/web_search \
+  -H "Authorization: Bearer $ZHIPU_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "search_query": "latest AI developments",
+    "search_engine": "search_pro_quark",
+    "search_intent": true,
+    "count": 20,
+    "search_recency_filter": "oneWeek",
+    "content_size": "high",
+    "search_domain_filter": "arstechnica.com"
+  }'
+```
 
-## Fallback / Degradation
+## Common Issues
 
-If the MCP endpoint is unreachable or returns errors, the agent may fall back to other available web search providers. Common issues:
+### "Api key not found" (MCP mode)
 
-- **401 / "Api key not found"**: Wrong endpoint — use the `mcp-broker/proxy` URL, not the old `web_search_prime` endpoint.
-- **"Tool not found: web_search_prime"**: The broker endpoint uses different tool names (`webSearchPro`, etc.).
-- **Empty results `[]`**: Verify your Zhipu account plan supports web search; check quota at <https://open.bigmodel.cn>.
+Wrong endpoint. Use the `mcp-broker/proxy` URL, not the deprecated `web_search_prime` endpoint.
+
+### "Tool not found: web_search_prime"
+
+The broker endpoint uses different tool names (`webSearchPro`, etc.). Use `webSearchPro` instead.
+
+### Empty results `[]`
+
+- Verify your Zhipu account plan supports web search
+- Check quota at <https://open.bigmodel.cn>
+- Try a different query or engine
+
+### mcporter not found
+
+Install it: `npm i -g mcporter`
+Or use cURL fallback by setting `ZHIPU_API_KEY` env var.
 
 ## Official Docs
 
-- Web Search overview: <https://docs.bigmodel.cn/cn/guide/tools/web-search>
-- MCP Server docs: <https://docs.bigmodel.cn/cn/coding-plan/mcp/search-mcp-server>
+- Web Search: <https://docs.bigmodel.cn/cn/guide/tools/web-search>
+- MCP Server: <https://docs.bigmodel.cn/cn/coding-plan/mcp/search-mcp-server>

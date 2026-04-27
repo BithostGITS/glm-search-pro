@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# setup.sh — Initialize glm-web-search skill
-# Checks prerequisites and generates mcporter config with user's Zhipu API key.
+# setup.sh — Initialize glm-search-pro skill
+# Reads API key ONLY from ZHIPU_API_KEY environment variable.
+# Writes mcporter config with restrictive permissions (600/700).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -8,63 +9,42 @@ SKILL_DIR="$(dirname "$SCRIPT_DIR")"
 MCP_DIR="${HOME}/.openclaw/config/mcporter"
 MCP_CONFIG="${MCP_DIR}/mcporter.json"
 
-echo "=== glm-web-search setup ==="
+echo "=== glm-search-pro setup ==="
 
-# 1. Check mcporter
-if ! command -v mcporter &>/dev/null && ! command -v npx &>/dev/null; then
-  echo "Error: mcporter or npx is required." >&2
-  echo "Install mcporter: npm i -g mcporter" >&2
+# 1. Check curl (required)
+if ! command -v curl &>/dev/null; then
+  echo "Error: curl is required but not found." >&2
   exit 1
 fi
 
-# 2. Get API key
-if [ -n "${ZHIPU_API_KEY:-}" ]; then
-  API_KEY="$ZHIPU_API_KEY"
-  echo "Using API key from ZHIPU_API_KEY env var."
+# 2. Check mcporter (optional, for MCP mode)
+HAS_MCPORTER=false
+if command -v mcporter &>/dev/null || command -v npx &>/dev/null; then
+  HAS_MCPORTER=true
+  echo "mcporter detected (optional, for MCP mode)."
 else
-  # Try existing config
-  EXISTING=""
-  [ -f "$MCP_CONFIG" ] && EXISTING=$(python3 -c "
-import json,sys
-try:
-    c=json.load(open('$MCP_CONFIG'))
-    servers=c.get('mcpServers',{})
-    gs=servers.get('glm-search',{})
-    url=gs.get('url','')
-    if 'Authorization=' in url:
-        print(url.split('Authorization=')[1].split('&')[0])
-except: pass
-" 2>/dev/null || true)
-
-  if [ -n "$EXISTING" ]; then
-    echo "Found existing API key in mcporter config."
-    API_KEY="$EXISTING"
-  else
-    # Check common zai config
-    ZAI_CFG="${HOME}/.openclaw/config/glm.json"
-    [ -f "$ZAI_CFG" ] && EXISTING=$(python3 -c "import json;print(json.load(open('$ZAI_CFG')).get('api_key',''))" 2>/dev/null || true)
-    if [ -n "$EXISTING" ]; then
-      echo "Found API key in $ZAI_CFG."
-      API_KEY="$EXISTING"
-    else
-      echo ""
-      echo "Enter your Zhipu API key (get one at https://open.bigmodel.cn):"
-      read -r API_KEY
-    fi
-  fi
+  echo "mcporter not found. cURL mode will be used (mcporter is optional)."
 fi
 
-if [ -z "$API_KEY" ]; then
-  echo "Error: No API key provided." >&2
+# 3. Get API key — ONLY from environment variable
+if [ -z "${ZHIPU_API_KEY:-}" ]; then
+  echo ""
+  echo "Error: ZHIPU_API_KEY environment variable is not set." >&2
+  echo "Get your API key at https://open.bigmodel.cn then:" >&2
+  echo "  export ZHIPU_API_KEY=\"your-api-key\"" >&2
+  echo "  bash scripts/setup.sh" >&2
   exit 1
 fi
 
-# 3. Write mcporter config
-mkdir -p "$MCP_DIR"
+API_KEY="$ZHIPU_API_KEY"
+echo "API key found in ZHIPU_API_KEY env var."
 
-# Merge into existing config or create new
+# 4. Write mcporter config with restrictive permissions
+mkdir -p "$MCP_DIR"
+chmod 700 "$MCP_DIR"
+
 python3 << PYEOF
-import json, os
+import json, os, stat
 
 config_path = "$MCP_CONFIG"
 api_key = "$API_KEY"
@@ -86,19 +66,39 @@ config["mcpServers"]["glm-search"] = {
 with open(config_path, "w") as f:
     json.dump(config, f, indent=2)
 
-print(f"Config written to {config_path}")
+# Set restrictive permissions (owner read/write only)
+os.chmod(config_path, 0o600)
+
+print(f"Config written to {config_path} (permissions: 600)")
 PYEOF
 
-# 4. Verify connection
+# 5. Verify connection
 echo ""
-echo "Verifying connection..."
-RESULT=$(npx -y mcporter --config "$MCP_CONFIG" list glm-search 2>&1) || true
-if echo "$RESULT" | grep -q "webSearchPro"; then
-  echo "✅ Connection successful. Available tools: webSearchPro, webSearchSogou, webSearchQuark, webSearchStd"
+if [ "$HAS_MCPORTER" = true ]; then
+  echo "Verifying MCP connection..."
+  RESULT=$(npx -y mcporter --config "$MCP_CONFIG" list glm-search 2>&1) || true
+  if echo "$RESULT" | grep -q "webSearchPro"; then
+    echo "✅ MCP connection successful. Available: webSearchPro, webSearchSogou, webSearchQuark, webSearchStd"
+  else
+    echo "⚠️  MCP verification inconclusive. Check with: npx -y mcporter --config $MCP_CONFIG list glm-search"
+  fi
+fi
+
+echo "Verifying cURL connection..."
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+  -H "Authorization: Bearer $API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"search_query":"test","search_engine":"search_pro","count":1}' \
+  "https://open.bigmodel.cn/api/paas/v4/web_search")
+
+if [ "$HTTP_CODE" = "200" ]; then
+  echo "✅ cURL connection successful."
 else
-  echo "⚠️  Could not verify connection. Check your API key and try:"
-  echo "   npx -y mcporter --config $MCP_CONFIG list glm-search"
+  echo "⚠️  cURL returned HTTP $HTTP_CODE. Check your API key."
 fi
 
 echo ""
-echo "Setup complete. Use: ${SKILL_DIR}/scripts/glm-search \"your query\""
+echo "Setup complete."
+echo "  MCP mode:  bash ${SKILL_DIR}/scripts/glm-search --mcp \"query\""
+echo "  cURL mode: bash ${SKILL_DIR}/scripts/glm-search --curl \"query\""
+echo "  Auto:      bash ${SKILL_DIR}/scripts/glm-search \"query\""
