@@ -10,7 +10,7 @@ An [OpenClaw](https://github.com/openclaw/openclaw) agent skill that provides re
 - 🇨🇳 **Works from China** — No VPN required, direct access to Zhipu's servers
 - 🔌 **MCP-native** — Uses official MCP protocol via `mcporter` client
 - ⚡ **One-command setup** — Auto-detects API key, generates config, verifies connection
-- 📦 **ClawHub published** — Install directly via `clawhub install glm-web-search`
+- 📦 **ClawHub published** — Install directly via `clawhub install glm-search-pro`
 
 ## Prerequisites
 
@@ -23,7 +23,7 @@ An [OpenClaw](https://github.com/openclaw/openclaw) agent skill that provides re
 ### Option A: Install via ClawHub
 
 ```bash
-clawhub install glm-web-search
+clawhub install glm-search-pro
 ```
 
 Then run setup:
@@ -35,7 +35,7 @@ bash <install-dir>/glm-web-search/scripts/setup.sh
 ### Option B: Clone this repo
 
 ```bash
-git clone https://github.com/BithostGITS/glm-web-search.git
+git clone https://github.com/BithostGITS/glm-search-pro.git
 cd glm-web-search
 bash scripts/setup.sh
 ```
