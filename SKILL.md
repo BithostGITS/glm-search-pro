@@ -19,33 +19,36 @@ metadata:
 
 # GLM Search Pro
 
-Web search powered by Zhipu GLM, with dual-backend support: **MCP** (via mcporter) and **cURL** (REST API fallback).
+Web search powered by Zhipu GLM, with dual-backend support: **cURL** (REST API, preferred) and **MCP** (via mcporter).
 
 ## Credentials
 
-This skill requires a **Zhipu API key**. Set it before use:
+This skill requires a **Zhipu API key**, provided via the `ZHIPU_API_KEY` environment variable.
 
-```bash
-export ZHIPU_API_KEY="your-api-key"
-```
+### cURL mode (preferred)
 
-The API key is **only read from the `ZHIPU_API_KEY` environment variable**. It is never hardcoded, never written to disk by this skill, and never embedded in URLs visible in config files. At runtime, the key is passed directly to the API via HTTP `Authorization` header (cURL mode) or as a transient URL parameter to the MCP broker endpoint (MCP mode).
+No setup required. The key is read from `$ZHIPU_API_KEY` at runtime and sent via HTTP `Authorization: Bearer` header. In cURL mode, no files are written to disk.
 
-### What this skill writes to disk
+### MCP mode (advanced)
 
-| File | Purpose | Permissions |
-|------|---------|-------------|
-| `~/.openclaw/config/mcporter/mcporter.json` | mcporter server config (URL with API key for MCP broker) | `600` (owner-only) |
-| `~/.openclaw/config/mcporter/` directory | Created if missing | `700` (owner-only) |
+If you need MCP mode, `setup.sh` will write a config file to disk:
 
-The setup script (`setup.sh`) is the only component that writes these files. It sets restrictive permissions (`chmod 600/700`) to limit exposure.
+| File | What it contains | Permissions |
+|------|-----------------|-------------|
+| `~/.openclaw/config/mcporter/mcporter.json` | MCP server URL with API key as query param | `600` (owner-only) |
+| `~/.openclaw/config/mcporter/` directory | Parent directory | `700` (owner-only) |
+
+**Important**: The Zhipu MCP broker endpoint requires the API key as a URL query parameter (`Authorization=<key>`). This is how their SSE endpoint works — the key cannot be passed via HTTP header for MCP connections. Setup writes this to `mcporter.json` with `600` permissions. If this is not acceptable, use cURL mode only (which passes the key via `Authorization` header at runtime and writes nothing to disk).
 
 ### What this skill reads
 
 | Source | When | Purpose |
 |--------|------|---------|
-| `$ZHIPU_API_KEY` env var | Always (preferred) | Primary API key source |
-| `~/.openclaw/config/glm.json` | Only during setup, as fallback | Legacy key location (not read at runtime) |
+| `$ZHIPU_API_KEY` env var | Every search (cURL mode), and during setup (MCP mode) | API key |
+
+### Recommendation
+
+For maximum security, use cURL mode and skip `setup.sh`. MCP mode is provided as a convenience but requires persisting the key on disk due to the Zhipu MCP broker's authentication design.
 
 ## Quick Start
 
@@ -53,10 +56,7 @@ The setup script (`setup.sh`) is the only component that writes these files. It 
 # Set your API key
 export ZHIPU_API_KEY="your-api-key"
 
-# Setup (one-time — configures mcporter, sets file permissions)
-bash scripts/setup.sh
-
-# Search
+# Search (cURL mode, no setup needed)
 bash scripts/glm-search "your query"
 
 # With options
@@ -67,19 +67,19 @@ bash scripts/glm-search -q "latest AI news" -c 20 -r oneWeek -e quark
 
 The script auto-selects the best available backend:
 
-1. **cURL mode** (preferred) — requires only `curl` + `ZHIPU_API_KEY` env var
-2. **MCP mode** (advanced) — requires `mcporter` + completed setup
+1. **cURL mode** (preferred) — `curl` + `ZHIPU_API_KEY` env var. Key sent via HTTP header. Nothing written to disk.
+2. **MCP mode** (advanced) — `mcporter` + config from `setup.sh`. Key stored in config file for MCP broker auth.
 
 Force a specific mode with `--curl` or `--mcp`.
 
 ## Search Engines
 
-| Engine | Flag | Backend | Best For |
-|--------|------|---------|----------|
-| Pro | `-e pro` | cURL / MCP | General purpose, best quality (**default**) |
-| Quark | `-e quark` | cURL / MCP | Advanced scenarios, Chinese content |
-| Sogou | `-e sogou` | cURL / MCP | China domestic content |
-| Std | `-e std` | cURL / MCP | Basic search, Q&A |
+| Engine | Flag | Best For |
+|--------|------|----------|
+| Pro | `-e pro` | General purpose, best quality (**default**) |
+| Quark | `-e quark` | Advanced scenarios, Chinese content |
+| Sogou | `-e sogou` | China domestic content |
+| Std | `-e std` | Basic search, Q&A |
 
 ## Parameters
 
@@ -98,7 +98,7 @@ Force a specific mode with `--curl` or `--mcp`.
 ## Examples
 
 ```bash
-# Basic search
+# Basic search (cURL mode auto-selected)
 glm-search "OpenClaw framework"
 
 # Recent news, more results
@@ -110,8 +110,8 @@ glm-search -q "最新科技新闻" -e sogou -r oneDay
 # Domain-specific search
 glm-search -q "Python async" -d docs.python.org
 
-# Force cURL mode with intent recognition
-glm-search --curl -i "What is machine learning"
+# Intent recognition (cURL only)
+glm-search -i "What is machine learning"
 ```
 
 ## Response Format
@@ -120,14 +120,12 @@ glm-search --curl -i "What is machine learning"
 {
   "id": "task-id",
   "created": 1704067200,
-  "search_intent": [{ "query": "...", "intent": "SEARCH_ALL", "keywords": "..." }],
   "search_result": [
     {
       "title": "Page Title",
       "content": "Page summary...",
       "link": "https://example.com",
       "media": "Source Name",
-      "icon": "https://...",
       "refer": "ref_1",
       "publish_date": "2026-04-27"
     }
@@ -140,22 +138,19 @@ glm-search --curl -i "What is machine learning"
 ```
 glm-search (script)
 ├── cURL mode (preferred)
-│   └── curl → Zhipu REST API (/paas/v4/web_search) → search_pro/sogou/quark/std
-└── MCP mode (advanced)
-    └── mcporter → Zhipu MCP Broker → webSearchPro/Sogou/Quark/Std
+│   └── curl + $ZHIPU_API_KEY → Authorization: Bearer header → Zhipu REST API
+└── MCP mode (advanced, requires setup)
+    └── mcporter → config from setup.sh → Zhipu MCP Broker SSE endpoint
 ```
 
-## Setup
+## Setup (MCP mode only)
 
 ```bash
+export ZHIPU_API_KEY="your-api-key"
 bash scripts/setup.sh
 ```
 
-This will:
-1. Check for `curl` (required) and `mcporter` (optional)
-2. Read API key from `$ZHIPU_API_KEY` environment variable only
-3. Generate mcporter config at `~/.openclaw/config/mcporter/mcporter.json` with `600` permissions
-4. Verify the connection
+This is **only needed for MCP mode**. cURL mode works immediately with `ZHIPU_API_KEY` set.
 
 ## Prerequisites
 

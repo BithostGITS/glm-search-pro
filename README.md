@@ -9,46 +9,34 @@ An [OpenClaw](https://github.com/openclaw/openclaw) agent skill published on [Cl
 - 🔍 **Dual-backend** — cURL (REST API, preferred) + MCP (via mcporter)
 - 🏎️ **Multi-engine** — Pro, Sogou, Quark, Std search engines
 - 🇨🇳 **Works from China** — No VPN required
-- 🔒 **Security-focused** — API key from env var only, restrictive file permissions, clear audit trail
-- ⚡ **One-command setup** — Auto-detects dependencies, verifies connection
+- 🔒 **Security-first** — cURL mode sends key via Authorization header only; MCP mode documents exactly what it writes and why
+- ⚡ **Zero setup for cURL** — Just set `ZHIPU_API_KEY` and go
 - 📦 **ClawHub published** — `clawhub install glm-search-pro`
-
-## Prerequisites
-
-- **Zhipu API key** — Get one at [open.bigmodel.cn](https://open.bigmodel.cn)
-- **curl** — Pre-installed on most systems
-- **mcporter** (optional, for MCP mode) — `npm i -g mcporter`
 
 ## Quick Start
 
 ```bash
-# Set your API key
+# Set your API key (get one at https://open.bigmodel.cn)
 export ZHIPU_API_KEY="your-api-key"
 
-# Install via ClawHub
+# Install
 clawhub install glm-search-pro
 
-# Setup (one-time)
-bash scripts/setup.sh
-
-# Search
+# Search (cURL mode, no setup needed)
 bash scripts/glm-search "your query"
+
+# With options
+bash scripts/glm-search -q "latest AI news" -c 20 -r oneWeek -e quark
 ```
 
 ## Usage
 
 ```bash
-# Basic search (auto-selects cURL mode)
-glm-search "OpenClaw framework"
-
-# With options
-glm-search -q "AI news" -c 20 -r oneWeek -e quark
-
-# Force MCP mode
-glm-search --mcp "latest tech"
-
-# With intent recognition (cURL only)
-glm-search --curl -i "What is machine learning"
+glm-search "OpenClaw framework"              # Basic
+glm-search -q "AI news" -c 20 -r oneWeek     # More results, recent
+glm-search -q "最新科技新闻" -e sogou -r oneDay  # Chinese via Sogou
+glm-search -q "Python async" -d docs.python.org  # Domain-specific
+glm-search -i "What is machine learning"     # Intent recognition
 ```
 
 **Parameters:**
@@ -65,37 +53,40 @@ glm-search --curl -i "What is machine learning"
 | `--curl` | — | Force cURL backend |
 | `--mcp` | — | Force MCP backend |
 
+## Backends
+
+| Mode | Key handling | Disk writes | Dependencies |
+|------|-------------|-------------|-------------|
+| **cURL** (preferred) | `Authorization: Bearer` header at runtime | None | `curl` + `$ZHIPU_API_KEY` |
+| **MCP** (advanced) | URL query param in config file (Zhipu MCP broker requirement) | `~/.openclaw/config/mcporter/mcporter.json` (600) | `mcporter` + `setup.sh` |
+
 ## Security
 
-- API key is read **only** from the `ZHIPU_API_KEY` environment variable
-- No API key is ever hardcoded in the skill
-- Config files are written with `600` permissions (owner-only)
-- Setup only accesses `~/.openclaw/config/mcporter/` (no other file reads)
-- All network traffic goes to `open.bigmodel.cn` only
-
-See [Security Scan Results](https://clawhub.ai/bithostgits/glm-search-pro) on ClawHub.
+- cURL mode: API key sent via standard `Authorization: Bearer` header, never persisted
+- MCP mode: Zhipu's MCP broker requires the key as a URL query parameter — `setup.sh` writes this to a config file with `600` permissions and clearly documents the tradeoff
+- Recommendation: Use cURL mode for maximum security; MCP mode is a convenience feature
 
 ## Architecture
 
 ```
 glm-search (script)
-├── cURL mode (preferred)
-│   └── curl → Zhipu REST API (/paas/v4/web_search) → search_pro/sogou/quark/std
-└── MCP mode (advanced)
-    └── mcporter → Zhipu MCP Broker → webSearchPro/Sogou/Quark/Std
+├── cURL mode (preferred, zero setup)
+│   └── curl + $ZHIPU_API_KEY → Authorization header → Zhipu REST API
+└── MCP mode (advanced, requires setup)
+    └── mcporter → config from setup.sh → Zhipu MCP Broker SSE
 ```
 
 ## File Structure
 
 ```
 glm-search-pro/
-├── SKILL.md                # Skill definition (OpenClaw / ClawHub)
+├── SKILL.md                # Skill definition
 ├── README.md               # This file
 ├── scripts/
-│   ├── setup.sh            # One-command initialization
-│   └── glm-search          # Search CLI wrapper (cURL + MCP)
+│   ├── setup.sh            # MCP mode initialization
+│   └── glm-search          # Search CLI (cURL + MCP)
 └── references/
-    └── api-notes.md        # Detailed API reference
+    └── api-notes.md        # API reference
 ```
 
 ## License
