@@ -57,10 +57,10 @@ For maximum security, use cURL mode and skip `setup.sh`. MCP mode is provided as
 export ZHIPU_API_KEY="your-api-key"
 
 # Search (cURL mode, no setup needed)
-bash scripts/glm-search "your query"
+bash scripts/glm-search.sh "your query"
 
 # With options
-bash scripts/glm-search -q "latest AI news" -c 20 -r oneWeek -e quark
+bash scripts/glm-search.sh -q "latest AI news" -c 20 -r oneWeek -e quark
 ```
 
 ## Backends

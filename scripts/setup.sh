@@ -99,6 +99,6 @@ fi
 
 echo ""
 echo "Setup complete."
-echo "  MCP mode:  bash ${SKILL_DIR}/scripts/glm-search --mcp \"query\""
-echo "  cURL mode: bash ${SKILL_DIR}/scripts/glm-search --curl \"query\""
-echo "  Auto:      bash ${SKILL_DIR}/scripts/glm-search \"query\""
+echo "  MCP mode:  bash ${SKILL_DIR}/scripts/glm-search.sh --mcp \"query\""
+echo "  cURL mode: bash ${SKILL_DIR}/scripts/glm-search.sh --curl \"query\""
+echo "  Auto:      bash ${SKILL_DIR}/scripts/glm-search.sh \"query\""
