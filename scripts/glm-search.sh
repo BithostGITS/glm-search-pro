@@ -80,21 +80,30 @@ declare -A REST_ENGINES=(
 MCP_TOOL="${MCP_ENGINES[$ENGINE]:-webSearchPro}"
 REST_ENGINE="${REST_ENGINES[$ENGINE]:-search_pro}"
 
-# Build JSON payload for cURL (safe quoting via python3)
+# Build JSON payload for cURL (safe: all values passed via environment, no variable interpolation in code)
 build_payload() {
-  python3 -c "
-import json
+  export _GLM_QUERY="$QUERY"
+  export _GLM_ENGINE="$REST_ENGINE"
+  export _GLM_INTENT="$INTENT"
+  export _GLM_COUNT="$COUNT"
+  export _GLM_RECENCY="$RECENCY"
+  export _GLM_SIZE="$CONTENT_SIZE"
+  export _GLM_DOMAIN="$DOMAIN"
+  python3 << 'PYEOF'
+import json, os
 payload = {
-    'search_query': $(python3 -c "import json;print(json.dumps('$QUERY'))" 2>/dev/null || echo "\"$QUERY\""),
-    'search_engine': '${REST_ENGINE}',
-    'search_intent': $( [ "$INTENT" = true ] && echo "True" || echo "False" ),
-    'count': ${COUNT},
-    'search_recency_filter': '${RECENCY}',
-    'content_size': '${CONTENT_SIZE}'
+    "search_query": os.environ["_GLM_QUERY"],
+    "search_engine": os.environ["_GLM_ENGINE"],
+    "search_intent": os.environ["_GLM_INTENT"].lower() == "true",
+    "count": int(os.environ["_GLM_COUNT"]),
+    "search_recency_filter": os.environ["_GLM_RECENCY"],
+    "content_size": os.environ["_GLM_SIZE"]
 }
-$( [ -n "$DOMAIN" ] && echo "payload['search_domain_filter'] = '$DOMAIN'" )
+domain = os.environ.get("_GLM_DOMAIN", "")
+if domain:
+    payload["search_domain_filter"] = domain
 print(json.dumps(payload))
-"
+PYEOF
 }
 
 # MCP mode via mcporter
