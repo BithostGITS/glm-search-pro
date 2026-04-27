@@ -12,7 +12,7 @@ metadata:
   {
     "openclaw":
       {
-        "requires": { "env": ["ZHIPU_API_KEY"], "bins": ["curl"] },
+        "requires": { "env": ["ZHIPU_API_KEY"], "bins": ["curl", "python3"] },
       },
   }
 ---
@@ -156,7 +156,8 @@ This is **only needed for MCP mode**. cURL mode works immediately with `ZHIPU_AP
 
 - **Zhipu API key** — <https://open.bigmodel.cn> (set as `ZHIPU_API_KEY` env var)
 - **curl** — pre-installed on most systems
-- **mcporter** (optional, for MCP mode) — `npm i -g mcporter`
+- **python3** — used by setup.sh for JSON config generation
+- **mcporter** (optional, for MCP mode) — `npm i -g mcporter` (invoked via `npx`)
 
 ## Troubleshooting
 
