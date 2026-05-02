@@ -96,3 +96,7 @@ MIT
 ## Author
 
 [BithostGITS](https://github.com/BithostGITS)
+
+## Download History
+
+[![Download History](https://skill-history.com/chart/bithostgits/glm-search-pro.svg)](https://skill-history.com/bithostgits/glm-search-pro)
